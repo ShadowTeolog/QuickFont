@@ -11,7 +11,7 @@ namespace QuickFont
     /// <summary>
     /// Meant to be the actual Font... a resource like <see cref="System.Drawing.Font"/>. Because it holds the textures (the fonts).
     /// </summary>
-    [DebuggerDisplay("{FontName}")]
+    //[DebuggerDisplay("{FontName}")]
     public class QFont : IDisposable
     {
         private QFontData _fontData;

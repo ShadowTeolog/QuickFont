@@ -195,25 +195,32 @@ namespace QuickFont
 
             GL.Uniform1(InstanceSharedState.ShaderVariables.SamplerLocation, 0);
             GL.ActiveTexture(InstanceSharedState.DefaultTextureUnit);
-
+            
             int start = 0;
             _vertexArrayObject.Bind();
+            GL.Disable(EnableCap.IndexArray); //disable index array if any
             foreach (var primitive in _glFontDrawingPimitives)
             {
-                var dpt = PrimitiveType.Triangles;
-                GL.ActiveTexture(QFontSharedState.DefaultTextureUnit);
-
-                // Use DrawArrays - first draw drop shadows, then draw actual font primitive
-                if (primitive.ShadowVertexRepr.Count > 0)
+                var font = primitive.Font;
+                if (font != null)
                 {
-                    //int index = primitive.Font.FontData.CalculateMaxHeight();
-                    GL.BindTexture(TextureTarget.Texture2D, primitive.Font.FontData.dropShadowFont.FontData.Pages[0].GLTexID);
-                    GL.DrawArrays(dpt, start, primitive.ShadowVertexRepr.Count);
-                    start += primitive.ShadowVertexRepr.Count;
+                    GL.ActiveTexture(QFontSharedState.DefaultTextureUnit);
+                    // Use DrawArrays - first draw drop shadows, then draw actual font primitive
+                    if (primitive.ShadowVertexRepr.Count > 0)
+                    {
+                        //int index = primitive.Font.FontData.CalculateMaxHeight();
+                        GL.BindTexture(TextureTarget.Texture2D, font.FontData.dropShadowFont.FontData.Pages[0].GLTexID);
+                        GL.DrawArrays(PrimitiveType.Triangles, start, primitive.ShadowVertexRepr.Count);
+                        start += primitive.ShadowVertexRepr.Count;
+                    }
+                    GL.BindTexture(TextureTarget.Texture2D, font.FontData.Pages[0].GLTexID);
+                    GL.DrawArrays(PrimitiveType.Triangles, start, primitive.CurrentVertexRepr.Count);
+                }
+                else
+                {
+                    int i = 0;
                 }
 
-                GL.BindTexture(TextureTarget.Texture2D, primitive.Font.FontData.Pages[0].GLTexID);
-                GL.DrawArrays(dpt, start, primitive.CurrentVertexRepr.Count);
                 start += primitive.CurrentVertexRepr.Count;
             }
             

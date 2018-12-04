@@ -149,11 +149,14 @@ namespace StarterKit
             this.WindowBorder = WindowBorder.Fixed;
         }
 
-        private void KeyDown(object sender, KeyboardKeyEventArgs keyEventArgs)
+        private void HandleKeyDown(object sender, KeyboardKeyEventArgs keyEventArgs)
         {
             int texmax = GL.GetInteger(GetPName.MaxTextureSize);
             switch (keyEventArgs.Key)
             {
+                case Key.Escape:
+                    Exit();
+                    break;
                 case Key.Space:
                 case Key.Right:
                     currentDemoPage++;
@@ -209,8 +212,7 @@ namespace StarterKit
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
-
-            this.Keyboard.KeyDown += KeyDown;
+            this.KeyDown += HandleKeyDown;
             drawing = new QFontDrawing();
             controlsDrawing = new QFontDrawing();
             controlsTextOpts = new QFontRenderOptions() { Colour = Color.FromArgb(new Color4(0.8f, 0.1f, 0.1f, 1.0f).ToArgb()), DropShadowActive = true };
@@ -279,9 +281,7 @@ namespace StarterKit
         protected override void OnUpdateFrame(FrameEventArgs e)
         {
             base.OnUpdateFrame(e);
-
-            if (Keyboard[Key.Escape])
-                Exit();
+            
 
             cnt += e.Time;
 
