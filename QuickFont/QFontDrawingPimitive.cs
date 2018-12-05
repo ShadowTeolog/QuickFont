@@ -8,168 +8,140 @@ namespace QuickFont
 {
     public class QFontDrawingPimitive
     {
-        private Vector3 _printOffset;
-        private readonly QFont _font;
-        private readonly IList<QVertex> _currentVertexRepr = new List<QVertex>();
-        private readonly IList<QVertex> _shadowVertexRepr = new List<QVertex>();
-#if DEBUG   // Keep copy of string for debug purposes, only
+        public readonly QFont Font;
+        public readonly QFontRenderOptions Options;
+
+#if DEBUG // Keep copy of string for debug purposes, only
         private string _DisplayText_dbg = "<processedtext>";
 #endif
+        private Vector3 PrintOffset;
 
         public QFontDrawingPimitive(QFont font, QFontRenderOptions options)
         {
-            _font = font;
+            Font = font;
             Options = options;
         }
 
         public QFontDrawingPimitive(QFont font)
         {
-            _font = font;
+            Font = font;
             Options = new QFontRenderOptions();
         }
 
-        public Vector3 PrintOffset
-        {
-            get { return _printOffset; }
-            set
-            {
-                _printOffset = value;
-    //if (Font.FontData.dropShadowFont != null)
-    //    Font.FontData.dropShadowFont.PrintOffset = value;
-            }
-        }
-
-        public float LineSpacing
-        {
-            get { return (float) Math.Ceiling(Font.FontData.maxGlyphHeight*this.Options.LineSpacing); }
-        }
-
-        public bool IsMonospacingActive
-        {
-            get { return Font.FontData.IsMonospacingActive(this.Options); }
-        }
-
-        public float MonoSpaceWidth
-        {
-            get { return Font.FontData.GetMonoSpaceWidth(this.Options); }
-        }
-
-        public QFont Font
-        {
-            get { return _font; }
-        }
-
-        public QFontRenderOptions Options { get; private set; }
-
         public SizeF LastSize { get; private set; }
+        internal List<QVertex> CurrentVertexRepr { get; } = new List<QVertex>();
+        internal List<QVertex> ShadowVertexRepr { get; } = new List<QVertex>();
 
-        internal IList<QVertex> CurrentVertexRepr
+        private float LineSpacing()
         {
-            get { return _currentVertexRepr; }
+            return (float) Math.Ceiling(Font.FontData.maxGlyphHeight * Options.LineSpacing);
         }
 
-        internal IList<QVertex> ShadowVertexRepr { get { return _shadowVertexRepr; } }
+        private bool IsMonospacingActive()
+        {
+            return Font.FontData.IsMonospacingActive(Options);
+        }
 
-        private void RenderDropShadow(float x, float y, char c, QFontGlyph nonShadowGlyph, QFont shadowFont, ref Rectangle clippingRectangle)
+        private float MonoSpaceWidth()
+        {
+            return Font.FontData.GetMonoSpaceWidth(Options);
+        }
+
+        private void RenderDropShadow(float x, float y, char c, QFontGlyph nonShadowGlyph, QFont shadowFont,
+            ref Rectangle clippingRectangle)
         {
             //note can cast drop shadow offset to int, but then you can't move the shadow smoothly...
-            if (shadowFont != null && this.Options.DropShadowActive)
+            if (shadowFont != null && Options.DropShadowActive)
             {
-                float xOffset = (_font.FontData.meanGlyphWidth*this.Options.DropShadowOffset.X + nonShadowGlyph.rect.Width*0.5f);
-                float yOffset = (_font.FontData.meanGlyphWidth*this.Options.DropShadowOffset.Y + nonShadowGlyph.rect.Height*0.5f + nonShadowGlyph.yOffset);
-                this.RenderGlyph(x + xOffset, y + yOffset, c, shadowFont, this.ShadowVertexRepr, clippingRectangle);
+                var xOffset = Font.FontData.meanGlyphWidth * Options.DropShadowOffset.X +
+                              nonShadowGlyph.rect.Width * 0.5f;
+                var yOffset = Font.FontData.meanGlyphWidth * Options.DropShadowOffset.Y +
+                              nonShadowGlyph.rect.Height * 0.5f + nonShadowGlyph.yOffset;
+                RenderGlyph(x + xOffset, y + yOffset, c, shadowFont, ShadowVertexRepr, ref clippingRectangle);
             }
         }
-        
-        private bool ScissorsTest(ref float x, ref float y, ref float width, ref float height, ref float u1, ref float v1, ref float u2, ref float v2, Rectangle clipRectangle)
+
+        private bool ScissorsTest(ref float x, ref float y, ref float width, ref float height, ref float u1,
+            ref float v1, ref float u2, ref float v2, Rectangle clipRectangle)
         {
             if (y > clipRectangle.Y + clipRectangle.Height)
             {
-                float oldHeight = height;
-                float delta = y - (clipRectangle.Y + clipRectangle.Height);
+                var oldHeight = height;
+                var delta = y - (clipRectangle.Y + clipRectangle.Height);
                 y = clipRectangle.Y + clipRectangle.Height;
                 height -= delta;
 
-                if (height <= 0)
-                {
-                    return true;
-                }
+                if (height <= 0) return true;
 
-                float dv = (float)delta / (float)oldHeight;
+                var dv = delta / oldHeight;
 
                 v1 += dv * (v2 - v1);
             }
 
-            if ((y - height) < (clipRectangle.Y))
+            if (y - height < clipRectangle.Y)
             {
-                float oldHeight = height;
-                float delta = (y - height) - clipRectangle.Y;
+                var oldHeight = height;
+                var delta = y - height - clipRectangle.Y;
 
                 height -= delta;
 
-                if (height <= 0)
-                {
-                    return true;
-                }
+                if (height <= 0) return true;
 
-                float dv = (float) delta/(float) oldHeight;
+                var dv = delta / oldHeight;
 
-                v2 -= dv*(v2 - v1);
+                v2 -= dv * (v2 - v1);
             }
 
             if (x < clipRectangle.X)
             {
-                float oldWidth = width;
-                float delta = clipRectangle.X - x;
+                var oldWidth = width;
+                var delta = clipRectangle.X - x;
                 x = clipRectangle.X;
                 width -= delta;
 
-                if (width <= 0)
-                {
-                    return true;
-                }
+                if (width <= 0) return true;
 
-                float du = (float)delta / (float)oldWidth;
+                var du = delta / oldWidth;
 
                 u1 += du * (u2 - u1);
             }
 
-            if ((x + width) > (clipRectangle.X + clipRectangle.Width))
+            if (x + width > clipRectangle.X + clipRectangle.Width)
             {
-                float oldWidth = width;
-                float delta = (x + width) - (clipRectangle.X + clipRectangle.Width);
+                var oldWidth = width;
+                var delta = x + width - (clipRectangle.X + clipRectangle.Width);
 
                 width -= delta;
 
-                if (width <= 0)
-                {
-                    return true;
-                }
+                if (width <= 0) return true;
 
-                float du = (float)delta / (float)oldWidth;
+                var du = delta / oldWidth;
 
                 u2 -= du * (u2 - u1);
             }
+
             return false;
         }
 
         /// <summary>
-        /// Renders the glyph at the position given.
+        ///     Renders the glyph at the position given.
         /// </summary>
         /// <param name="x">The x.</param>
         /// <param name="y">The y.</param>
         /// <param name="c">The character to print.</param>
-        internal void RenderGlyph(float x, float y, char c, QFont font, IList<QVertex> store, Rectangle clippingRectangle)
+        /// <param name="font">font used for render</param>
+        /// <param name="store">target vertex buffer</param>
+        internal void RenderGlyph(float x, float y, char c, QFont font, List<QVertex> store, ref Rectangle clippingRectangle)
         {
-            QFontGlyph glyph = font.FontData.CharSetMapping[c];
+            var glyph = font.FontData.CharSetMapping[c];
 
             //note: it's not immediately obvious, but this combined with the paramteters to 
             //RenderGlyph for the shadow mean that we render the shadow centrally (despite it being a different size)
             //under the glyph
             if (font.FontData.isDropShadow)
             {
-                x -= (int) (glyph.rect.Width*0.5f);
-                y -= (int) (glyph.rect.Height*0.5f + glyph.yOffset);
+                x -= (int) (glyph.rect.Width * 0.5f);
+                y -= (int) (glyph.rect.Height * 0.5f + glyph.yOffset);
             }
             else
             {
@@ -178,144 +150,121 @@ namespace QuickFont
 
             y = -y;
 
-            TexturePage sheet = font.FontData.Pages[glyph.page];
+            var sheet = font.FontData.Pages[glyph.page];
 
-            float tx1 = (float)(glyph.rect.X) / sheet.Width;
-            float ty1 = (float)(glyph.rect.Y) / sheet.Height;
-            float tx2 = (float)(glyph.rect.X + glyph.rect.Width) / sheet.Width;
-            float ty2 = (float)(glyph.rect.Y + glyph.rect.Height) / sheet.Height;
+            var tx1 = (float) glyph.rect.X / sheet.Width;
+            var ty1 = (float) glyph.rect.Y / sheet.Height;
+            var tx2 = (float) (glyph.rect.X + glyph.rect.Width) / sheet.Width;
+            var ty2 = (float) (glyph.rect.Y + glyph.rect.Height) / sheet.Height;
 
-            float vx = x + PrintOffset.X;
-            float vy = y - glyph.yOffset + PrintOffset.Y;
+            var vx = x + PrintOffset.X;
+            var vy = y - glyph.yOffset + PrintOffset.Y;
             float vwidth = glyph.rect.Width;
             float vheight = glyph.rect.Height;
 
-            if (clippingRectangle != default(Rectangle) && ScissorsTest(ref vx, ref vy, ref vwidth, ref vheight, ref tx1, ref ty1, ref tx2, ref ty2, clippingRectangle)) return;
+            if (clippingRectangle != default(Rectangle) && ScissorsTest(ref vx, ref vy, ref vwidth, ref vheight,
+                    ref tx1, ref ty1, ref tx2, ref ty2, clippingRectangle)) return;
 
             var tv1 = new Vector2(tx1, ty1);
             var tv2 = new Vector2(tx1, ty2);
             var tv3 = new Vector2(tx2, ty2);
             var tv4 = new Vector2(tx2, ty1);
 
-            Vector3 v1 = new Vector3(vx, vy, PrintOffset.Z);
-            Vector3 v2 = new Vector3(vx, vy - vheight, PrintOffset.Z);
-            Vector3 v3 = new Vector3(vx + vwidth, vy - vheight, PrintOffset.Z);
-            Vector3 v4 = new Vector3(vx + vwidth, vy, PrintOffset.Z);
+            var v1 = new Vector3(vx, vy, PrintOffset.Z);
+            var v2 = new Vector3(vx, vy - vheight, PrintOffset.Z);
+            var v3 = new Vector3(vx + vwidth, vy - vheight, PrintOffset.Z);
+            var v4 = new Vector3(vx + vwidth, vy, PrintOffset.Z);
 
-            Color color;
-            if (font.FontData.isDropShadow)
-                color = this.Options.DropShadowColour;
-            else
-                color = this.Options.Colour;
+            var color = font.FontData.isDropShadow ? Options.DropShadowColour : Options.Colour;
 
-            Vector4 colour = Helper.ToVector4(color);
+            var colour = Helper.ToVector4(color);
 
-            store.Add(new QVertex() { Position = v1, TextureCoord = tv1, VertexColor = colour });
-            store.Add(new QVertex() { Position = v2, TextureCoord = tv2, VertexColor = colour });
-            store.Add(new QVertex() { Position = v3, TextureCoord = tv3, VertexColor = colour });
+            store.Add(new QVertex {Position = v1, TextureCoord = tv1, VertexColor = colour});
+            store.Add(new QVertex {Position = v2, TextureCoord = tv2, VertexColor = colour});
+            store.Add(new QVertex {Position = v3, TextureCoord = tv3, VertexColor = colour});
 
-            store.Add(new QVertex() { Position = v1, TextureCoord = tv1, VertexColor = colour });
-            store.Add(new QVertex() { Position = v3, TextureCoord = tv3, VertexColor = colour });
-            store.Add(new QVertex() { Position = v4, TextureCoord = tv4, VertexColor = colour });
+            store.Add(new QVertex {Position = v1, TextureCoord = tv1, VertexColor = colour});
+            store.Add(new QVertex {Position = v3, TextureCoord = tv3, VertexColor = colour});
+            store.Add(new QVertex {Position = v4, TextureCoord = tv4, VertexColor = colour});
         }
-
 
         private float MeasureNextlineLength(string text)
         {
+            var isMonospacingActive = IsMonospacingActive();
             float xOffset = 0;
-
-            for (int i = 0; i < text.Length; i++)
+            for (var i = 0; i < text.Length; i++)
             {
-                char c = text[i];
-
-                if (c == '\r' || c == '\n')
+                var c = text[i];
+                if (c == '\r' || c == '\n') break;
+                if (isMonospacingActive)
                 {
-                    break;
-                }
-
-
-                if (IsMonospacingActive)
-                {
-                    xOffset += MonoSpaceWidth;
+                    xOffset += MonoSpaceWidth();
                 }
                 else
                 {
-                    //space
+                    QFontGlyph glyph;
                     if (c == ' ')
-                    {
-                        xOffset += (float) Math.Ceiling(_font.FontData.meanGlyphWidth*this.Options.WordSpacing);
-                    }
-                        //normal character
-                    else if (_font.FontData.CharSetMapping.ContainsKey(c))
-                    {
-                        QFontGlyph glyph = _font.FontData.CharSetMapping[c];
+                        xOffset += (float) Math.Ceiling(Font.FontData.meanGlyphWidth * Options.WordSpacing);
+                    else if (Font.FontData.CharSetMapping.TryGetValue(c, out glyph)) //normal character
                         xOffset +=
                             (float)
-                            Math.Ceiling(glyph.rect.Width + _font.FontData.meanGlyphWidth * this.Options.CharacterSpacing + 
-                                _font.FontData.GetKerningPairCorrection(i, text, null));
-                    }
+                            Math.Ceiling(glyph.rect.Width + Font.FontData.meanGlyphWidth * Options.CharacterSpacing +
+                                         Font.FontData.GetKerningPairCorrection(i, text, null));
                 }
             }
+
             return xOffset;
         }
 
         private Vector2 TransformPositionToViewport(Vector2 input)
         {
-            Viewport? v2 = this.Options.TransformToViewport;
-            if (v2 == null)
-            {
-                return input;
-            }
-            Viewport? v1 = ViewportHelper.CurrentViewport;
+            var v2 = Options.TransformToViewport;
+            if (v2 == null) return input;
+            var v1 = ViewportHelper.CurrentViewport;
 
             float X, Y;
 
             Debug.Assert(v1 != null, "v1 != null");
-            X = (input.X - v2.Value.X)*(v1.Value.Width/v2.Value.Width);
-            Y = (input.Y - v2.Value.Y)*(v1.Value.Height/v2.Value.Height);
+            X = (input.X - v2.Value.X) * (v1.Value.Width / v2.Value.Width);
+            Y = (input.Y - v2.Value.Y) * (v1.Value.Height / v2.Value.Height);
 
             return new Vector2(X, Y);
         }
 
         private static float TransformWidthToViewport(float input, QFontRenderOptions options)
         {
-            Viewport? v2 = options.TransformToViewport;
-            if (v2 == null)
-            {
-                return input;
-            }
-            Viewport? v1 = ViewportHelper.CurrentViewport;
+            var v2 = options.TransformToViewport;
+            if (v2 == null) return input;
+            var v1 = ViewportHelper.CurrentViewport;
 
             Debug.Assert(v1 != null, "v1 != null");
-            return input*(v1.Value.Width/v2.Value.Width);
+            return input * (v1.Value.Width / v2.Value.Width);
         }
 
         private SizeF TransformMeasureFromViewport(SizeF input)
         {
-            Viewport? v2 = this.Options.TransformToViewport;
-            if (v2 == null)
-            {
-                return input;
-            }
-            Viewport? v1 = ViewportHelper.CurrentViewport;
+            var v2 = Options.TransformToViewport;
+            if (v2 == null) return input;
+            var v1 = ViewportHelper.CurrentViewport;
 
             float X, Y;
 
             Debug.Assert(v1 != null, "v1 != null");
-            X = input.Width*(v2.Value.Width/v1.Value.Width);
-            Y = input.Height*(v2.Value.Height/v1.Value.Height);
+            X = input.Width * (v2.Value.Width / v1.Value.Width);
+            Y = input.Height * (v2.Value.Height / v1.Value.Height);
 
             return new SizeF(X, Y);
         }
 
         private Vector2 LockToPixel(Vector2 input)
         {
-            if (this.Options.LockToPixel)
+            if (Options.LockToPixel)
             {
-                float r = this.Options.LockToPixelRatio;
-                return new Vector2((1 - r)*input.X + r*((int) Math.Round(input.X)),
-                                   (1 - r)*input.Y + r*((int) Math.Round(input.Y)));
+                var r = Options.LockToPixelRatio;
+                return new Vector2((1 - r) * input.X + r * (int) Math.Round(input.X),
+                    (1 - r) * input.Y + r * (int) Math.Round(input.Y));
             }
+
             return input;
         }
 
@@ -324,40 +273,47 @@ namespace QuickFont
             return new Vector3(LockToPixel(TransformPositionToViewport(input.Xy))) {Z = input.Z};
         }
 
-        public SizeF Print(string text, Vector3 position, QFontAlignment alignment, Rectangle clippingRectangle = default(Rectangle))
+        private void PrepareVertexCapacityFromLetterCount(int LetterCount)
         {
+            CurrentVertexRepr.Capacity += LetterCount * 4;
+        }
+        public SizeF Print(string text, Vector3 position, QFontAlignment alignment,
+            Rectangle clippingRectangle = default(Rectangle))
+        {
+            PrepareVertexCapacityFromLetterCount(text.Length);
             PrintOffset = TransformToViewport(position);
             return PrintOrMeasure(text, alignment, false, clippingRectangle);
         }
 
-        public SizeF Print(string text, Vector3 position, QFontAlignment alignment, Color color, Rectangle clippingRectangle = default(Rectangle))
+        public SizeF Print(string text, Vector3 position, QFontAlignment alignment, Color color,
+            Rectangle clippingRectangle = default(Rectangle))
         {
-            this.Options.Colour = color;
+            PrepareVertexCapacityFromLetterCount(text.Length);
+            Options.Colour = color;
             PrintOffset = TransformToViewport(position);
             return PrintOrMeasure(text, alignment, false, clippingRectangle);
         }
 
-        public SizeF Print(string text, Vector3 position, SizeF maxSize, QFontAlignment alignment, Rectangle clippingRectangle = default(Rectangle))
+        public SizeF Print(string text, Vector3 position, SizeF maxSize, QFontAlignment alignment,
+            Rectangle clippingRectangle = default(Rectangle))
         {
-            ProcessedText processedText = ProcessText(_font, Options, text, maxSize, alignment);
+            var processedText = ProcessText(Font, Options, text, maxSize, alignment);
             return Print(processedText, TransformToViewport(position), clippingRectangle);
         }
 
-        public SizeF Print(string text, Vector3 position, SizeF maxSize, QFontAlignment alignment, Color colour, Rectangle clippingRectangle = default(Rectangle))
+        public SizeF Print(ProcessedText processedText, Vector3 position,
+            Rectangle clippingRectangle = default(Rectangle))
         {
-            ProcessedText processedText = ProcessText(_font, Options, text, maxSize, alignment);
-            return Print(processedText, TransformToViewport(position), colour, clippingRectangle);
-        }
-
-        public SizeF Print(ProcessedText processedText, Vector3 position, Rectangle clippingRectangle = default(Rectangle))
-        {
+            PrepareVertexCapacityFromLetterCount(processedText.EstimatedLength());
             PrintOffset = TransformToViewport(position);
             return PrintOrMeasure(processedText, false, clippingRectangle);
         }
 
-        public SizeF Print(ProcessedText processedText, Vector3 position, Color colour, Rectangle clippingRectangle = default(Rectangle))
+        public SizeF Print(ProcessedText processedText, Vector3 position, Color colour,
+            Rectangle clippingRectangle = default(Rectangle))
         {
-            this.Options.Colour = colour;
+            PrepareVertexCapacityFromLetterCount(processedText.EstimatedLength());
+            Options.Colour = colour;
             PrintOffset = TransformToViewport(position);
             return PrintOrMeasure(processedText, false, clippingRectangle);
         }
@@ -381,7 +337,7 @@ namespace QuickFont
         /// <returns></returns>
         public SizeF Measure(string text, SizeF maxSize, QFontAlignment alignment)
         {
-            ProcessedText processedText = ProcessText(_font, Options, text, maxSize, alignment);
+            var processedText = ProcessText(Font, Options, text, maxSize, alignment);
             return Measure(processedText);
         }
 
@@ -395,14 +351,15 @@ namespace QuickFont
             return TransformMeasureFromViewport(PrintOrMeasure(processedText, true));
         }
 
-        private SizeF PrintOrMeasure(string text, QFontAlignment alignment, bool measureOnly, Rectangle clippingRectangle = default(Rectangle))
+        private SizeF PrintOrMeasure(string text, QFontAlignment alignment, bool measureOnly,
+            Rectangle clippingRectangle = default(Rectangle))
         {
-            float maxWidth = 0f;
-            float xOffset = 0f;
-            float yOffset = 0f;
+            var maxWidth = 0f;
+            var xOffset = 0f;
+            var yOffset = 0f;
 
-            float maxXpos = float.MinValue;
-            float minXPos = float.MaxValue;
+            var maxXpos = float.MinValue;
+            var minXPos = float.MaxValue;
 
             text = text.Replace("\r\n", "\r");
 #if DEBUG
@@ -411,47 +368,47 @@ namespace QuickFont
             if (alignment == QFontAlignment.Right)
                 xOffset -= MeasureNextlineLength(text);
             else if (alignment == QFontAlignment.Centre)
-                xOffset -= (int) (0.5f*MeasureNextlineLength(text));
-
-            for (int i = 0; i < text.Length; i++)
+                xOffset -= (int) (0.5f * MeasureNextlineLength(text));
+            var lineSpacing = LineSpacing();
+            var isMonospacingActive = IsMonospacingActive();
+            for (var i = 0; i < text.Length; i++)
             {
-                char c = text[i];
-
+                var c = text[i];
                 //newline
                 if (c == '\r' || c == '\n')
                 {
-                    yOffset += LineSpacing;
+                    yOffset += lineSpacing;
                     xOffset = 0f;
 
                     if (alignment == QFontAlignment.Right)
                         xOffset -= MeasureNextlineLength(text.Substring(i + 1));
                     else if (alignment == QFontAlignment.Centre)
-                        xOffset -= (int) (0.5f*MeasureNextlineLength(text.Substring(i + 1)));
+                        xOffset -= (int) (0.5f * MeasureNextlineLength(text.Substring(i + 1)));
                 }
                 else
                 {
                     minXPos = Math.Min(xOffset, minXPos);
 
-                    //normal character
-                    if (c != ' ' && _font.FontData.CharSetMapping.ContainsKey(c))
+                    if (c == ' ')
                     {
-                        if (!measureOnly)
-                            RenderGlyph(xOffset, yOffset, c, _font, CurrentVertexRepr, clippingRectangle);
+                        xOffset += isMonospacingActive
+                            ? MonoSpaceWidth()
+                            : (float) Math.Ceiling(Font.FontData.meanGlyphWidth * Options.WordSpacing);
                     }
-
-                    if (IsMonospacingActive)
-                        xOffset += MonoSpaceWidth;
                     else
                     {
-                        if (c == ' ')
-                            xOffset += (float)Math.Ceiling(_font.FontData.meanGlyphWidth * this.Options.WordSpacing);
-                            //normal character
-                        else if (_font.FontData.CharSetMapping.ContainsKey(c))
+                        QFontGlyph glyph;
+                        //normal character
+                        if (Font.FontData.CharSetMapping.TryGetValue(c, out glyph))
                         {
-                            QFontGlyph glyph = _font.FontData.CharSetMapping[c];
-                            xOffset +=
-                                (float)
-                                Math.Ceiling(glyph.rect.Width + _font.FontData.meanGlyphWidth * this.Options.CharacterSpacing + _font.FontData.GetKerningPairCorrection(i, text, null));
+                            if (!measureOnly)
+                                RenderGlyph(xOffset, yOffset, c, Font, CurrentVertexRepr, ref clippingRectangle);
+                            if (isMonospacingActive)
+                                xOffset += MonoSpaceWidth();
+                            else
+                                xOffset += (float) Math.Ceiling(
+                                    glyph.rect.Width + Font.FontData.meanGlyphWidth * Options.CharacterSpacing +
+                                    Font.FontData.GetKerningPairCorrection(i, text, null));
                         }
                     }
 
@@ -462,20 +419,21 @@ namespace QuickFont
             if (minXPos != float.MaxValue)
                 maxWidth = maxXpos - minXPos;
 
-            LastSize = new SizeF(maxWidth, yOffset + LineSpacing);
+            LastSize = new SizeF(maxWidth, yOffset + lineSpacing);
             return LastSize;
         }
 
-        private SizeF PrintOrMeasure(ProcessedText processedText, bool measureOnly, Rectangle clippingRectangle = default(Rectangle))
+        private SizeF PrintOrMeasure(ProcessedText processedText, bool measureOnly,
+            Rectangle clippingRectangle = default(Rectangle))
         {
             // init values we'll return
-            float maxMeasuredWidth = 0f;
+            var maxMeasuredWidth = 0f;
 
-            float xPos = 0f;
-            float yPos = 0f;
+            var xPos = 0f;
+            var yPos = 0f;
 
-            float xOffset = xPos;
-            float yOffset = yPos;
+            var xOffset = xPos;
+            var yOffset = yPos;
 
             //make sure fontdata font's options are synced with the actual options
             ////if (_font.FontData.dropShadowFont != null && _font.FontData.dropShadowFont.Options != this.Options)
@@ -483,30 +441,31 @@ namespace QuickFont
             ////    _font.FontData.dropShadowFont.Options = this.Options;
             ////}
 
-            float maxWidth = processedText.maxSize.Width;
-            QFontAlignment alignment = processedText.alignment;
+            var maxWidth = processedText.maxSize.Width;
+            var alignment = processedText.alignment;
 
 
             //TODO - use these instead of translate when rendering by position (at some point)
 
-            TextNodeList nodeList = processedText.textNodeList;
-            for (TextNode node = nodeList.Head; node != null; node = node.Next)
+            var nodeList = processedText.textNodeList;
+            for (var node = nodeList.Head; node != null; node = node.Next)
                 node.LengthTweak = 0f; //reset tweaks
 
 
             if (alignment == QFontAlignment.Right)
                 xOffset -= (float) Math.Ceiling(TextNodeLineLength(nodeList.Head, maxWidth) - maxWidth);
             else if (alignment == QFontAlignment.Centre)
-                xOffset -= (float) Math.Ceiling(0.5f*TextNodeLineLength(nodeList.Head, maxWidth));
+                xOffset -= (float) Math.Ceiling(0.5f * TextNodeLineLength(nodeList.Head, maxWidth));
             else if (alignment == QFontAlignment.Justify)
                 JustifyLine(nodeList.Head, maxWidth);
 
 
-            bool atLeastOneNodeCosumedOnLine = false;
-            float length = 0f;
-            for (TextNode node = nodeList.Head; node != null; node = node.Next)
+            var atLeastOneNodeCosumedOnLine = false;
+            var length = 0f;
+            var lineSpacing = LineSpacing();
+            for (var node = nodeList.Head; node != null; node = node.Next)
             {
-                bool newLine = false;
+                var newLine = false;
 
                 if (node.Type == TextNodeType.LineBreak)
                 {
@@ -514,7 +473,7 @@ namespace QuickFont
                 }
                 else
                 {
-                    if (this.Options.WordWrap && SkipTrailingSpace(node, length, maxWidth) && atLeastOneNodeCosumedOnLine)
+                    if (Options.WordWrap && SkipTrailingSpace(node, length, maxWidth) && atLeastOneNodeCosumedOnLine)
                     {
                         newLine = true;
                     }
@@ -528,23 +487,25 @@ namespace QuickFont
 
                         maxMeasuredWidth = Math.Max(length, maxMeasuredWidth);
                     }
-                    else if (this.Options.WordWrap)
+                    else if (Options.WordWrap)
                     {
                         newLine = true;
                         if (node.Previous != null)
                             node = node.Previous;
                     }
                     else
+                    {
                         continue; // continue so we still read line breaks even if reached max width
+                    }
                 }
 
                 if (newLine)
                 {
                     if (processedText.maxSize.Height > 0 &&
-                        yOffset + LineSpacing - yPos >= processedText.maxSize.Height)
+                        yOffset + lineSpacing - yPos >= processedText.maxSize.Height)
                         break;
 
-                    yOffset += LineSpacing;
+                    yOffset += lineSpacing;
                     xOffset = xPos;
                     length = 0f;
                     atLeastOneNodeCosumedOnLine = false;
@@ -554,14 +515,14 @@ namespace QuickFont
                         if (alignment == QFontAlignment.Right)
                             xOffset -= (float) Math.Ceiling(TextNodeLineLength(node.Next, maxWidth) - maxWidth);
                         else if (alignment == QFontAlignment.Centre)
-                            xOffset -= (float) Math.Ceiling(0.5f*TextNodeLineLength(node.Next, maxWidth));
+                            xOffset -= (float) Math.Ceiling(0.5f * TextNodeLineLength(node.Next, maxWidth));
                         else if (alignment == QFontAlignment.Justify)
                             JustifyLine(node.Next, maxWidth);
                     }
                 }
             }
 
-            LastSize = new SizeF(maxMeasuredWidth, yOffset + LineSpacing - yPos);
+            LastSize = new SizeF(maxMeasuredWidth, yOffset + lineSpacing - yPos);
             return LastSize;
         }
 
@@ -570,36 +531,35 @@ namespace QuickFont
             if (node.Type != TextNodeType.Word)
                 return;
 
-            int charGaps = node.Text.Length - 1;
-            bool isCrumbleWord = CrumbledWord(node);
+            var charGaps = node.Text.Length - 1;
+            var isCrumbleWord = CrumbledWord(node);
             if (isCrumbleWord)
                 charGaps++;
 
-            int pixelsPerGap = 0;
-            int leftOverPixels = 0;
+            var pixelsPerGap = 0;
+            var leftOverPixels = 0;
 
             if (charGaps != 0)
             {
-                pixelsPerGap = (int) node.LengthTweak/charGaps;
-                leftOverPixels = (int) node.LengthTweak - pixelsPerGap*charGaps;
+                pixelsPerGap = (int) node.LengthTweak / charGaps;
+                leftOverPixels = (int) node.LengthTweak - pixelsPerGap * charGaps;
             }
 
-            for (int i = 0; i < node.Text.Length; i++)
+            var isMonospacingActive = IsMonospacingActive();
+            for (var i = 0; i < node.Text.Length; i++)
             {
-                char c = node.Text[i];
-                if (_font.FontData.CharSetMapping.ContainsKey(c))
+                var c = node.Text[i];
+                QFontGlyph glyph;
+                if (Font.FontData.CharSetMapping.TryGetValue(c, out glyph))
                 {
-                    QFontGlyph glyph = _font.FontData.CharSetMapping[c];
-
-                    RenderGlyph(x, y, c, _font, CurrentVertexRepr, clippingRectangle);
-
-
-                    if (IsMonospacingActive)
-                        x += MonoSpaceWidth;
+                    RenderGlyph(x, y, c, Font, CurrentVertexRepr, ref clippingRectangle);
+                    if (isMonospacingActive)
+                        x += MonoSpaceWidth();
                     else
                         x +=
                             (int)
-                            Math.Ceiling(glyph.rect.Width + _font.FontData.meanGlyphWidth * this.Options.CharacterSpacing + _font.FontData.GetKerningPairCorrection(i, node.Text, node));
+                            Math.Ceiling(glyph.rect.Width + Font.FontData.meanGlyphWidth * Options.CharacterSpacing +
+                                         Font.FontData.GetKerningPairCorrection(i, node.Text, node));
 
                     x += pixelsPerGap;
                     if (leftOverPixels > 0)
@@ -629,7 +589,7 @@ namespace QuickFont
             if (node == null)
                 return 0;
 
-            bool atLeastOneNodeCosumedOnLine = false;
+            var atLeastOneNodeCosumedOnLine = false;
             float length = 0;
             for (; node != null; node = node.Next)
             {
@@ -649,12 +609,13 @@ namespace QuickFont
                     break;
                 }
             }
+
             return length;
         }
 
         private bool CrumbledWord(TextNode node)
         {
-            return (node.Type == TextNodeType.Word && node.Next != null && node.Next.Type == TextNodeType.Word);
+            return node.Type == TextNodeType.Word && node.Next != null && node.Next.Type == TextNodeType.Word;
         }
 
         /// <summary>
@@ -663,22 +624,22 @@ namespace QuickFont
         /// </summary>
         private void JustifyLine(TextNode node, float targetLength)
         {
-            bool justifiable = false;
+            var justifiable = false;
 
             if (node == null)
                 return;
 
-            TextNode headNode = node; //keep track of the head node
+            var headNode = node; //keep track of the head node
 
 
             //start by finding the length of the block of text that we know will actually fit:
 
-            int charGaps = 0;
-            int spaceGaps = 0;
+            var charGaps = 0;
+            var spaceGaps = 0;
 
-            bool atLeastOneNodeCosumedOnLine = false;
+            var atLeastOneNodeCosumedOnLine = false;
             float length = 0;
-            TextNode expandEndNode = node; //the node at the end of the smaller list (before adding additional word)
+            var expandEndNode = node; //the node at the end of the smaller list (before adding additional word)
             for (; node != null; node = node.Next)
             {
                 if (node.Type == TextNodeType.LineBreak)
@@ -699,7 +660,7 @@ namespace QuickFont
 
                     if (node.Type == TextNodeType.Word)
                     {
-                        charGaps += (node.Text.Length - 1);
+                        charGaps += node.Text.Length - 1;
 
                         //word was part of a crumbled word, so there's an extra char cap between the two words
                         if (CrumbledWord(node))
@@ -717,10 +678,10 @@ namespace QuickFont
             }
 
             //now we check how much additional length is added by adding an additional word to the line
-            float extraLength = 0f;
-            int extraSpaceGaps = 0;
-            int extraCharGaps = 0;
-            bool contractPossible = false;
+            var extraLength = 0f;
+            var extraSpaceGaps = 0;
+            var extraCharGaps = 0;
+            var contractPossible = false;
             TextNode contractEndNode = null;
             for (node = expandEndNode.Next; node != null; node = node.Next)
             {
@@ -737,7 +698,7 @@ namespace QuickFont
                     contractEndNode = node;
                     contractPossible = true;
                     extraLength += node.Length;
-                    extraCharGaps += (node.Text.Length - 1);
+                    extraCharGaps += node.Text.Length - 1;
                     break;
                 }
             }
@@ -745,12 +706,12 @@ namespace QuickFont
             if (justifiable)
             {
                 //last part of this condition is to ensure that the full contraction is possible (it is all or nothing with contractions, since it looks really bad if we don't manage the full)
-                bool contract = contractPossible &&
-                                (extraLength + length - targetLength)*this.Options.JustifyContractionPenalty <
-                                (targetLength - length) &&
-                                ((targetLength - (length + extraLength + 1))/targetLength > -this.Options.JustifyCapContract);
+                var contract = contractPossible &&
+                               (extraLength + length - targetLength) * Options.JustifyContractionPenalty <
+                               targetLength - length &&
+                               (targetLength - (length + extraLength + 1)) / targetLength > -Options.JustifyCapContract;
 
-                if ((!contract && length < targetLength) || (contract && length + extraLength > targetLength))
+                if (!contract && length < targetLength || contract && length + extraLength > targetLength)
                     //calculate padding pixels per word and char
                 {
                     if (contract)
@@ -763,19 +724,19 @@ namespace QuickFont
 
                     var totalPixels = (int) (targetLength - length);
                     //the total number of pixels that need to be added to line to justify it
-                    int spacePixels = 0; //number of pixels to spread out amongst spaces
-                    int charPixels = 0; //number of pixels to spread out amongst char gaps
+                    var spacePixels = 0; //number of pixels to spread out amongst spaces
+                    var charPixels = 0; //number of pixels to spread out amongst char gaps
 
 
                     if (contract)
                     {
-                        if (totalPixels/targetLength < -this.Options.JustifyCapContract)
-                            totalPixels = (int) (-this.Options.JustifyCapContract*targetLength);
+                        if (totalPixels / targetLength < -Options.JustifyCapContract)
+                            totalPixels = (int) (-Options.JustifyCapContract * targetLength);
                     }
                     else
                     {
-                        if (totalPixels/targetLength > this.Options.JustifyCapExpand)
-                            totalPixels = (int) (this.Options.JustifyCapExpand*targetLength);
+                        if (totalPixels / targetLength > Options.JustifyCapExpand)
+                            totalPixels = (int) (Options.JustifyCapExpand * targetLength);
                     }
 
                     //work out how to spread pixles between character gaps and word spaces
@@ -791,35 +752,36 @@ namespace QuickFont
                     {
                         if (contract)
                             charPixels =
-                                (int) (totalPixels*this.Options.JustifyCharacterWeightForContract*charGaps/spaceGaps);
+                                (int) (totalPixels * Options.JustifyCharacterWeightForContract * charGaps / spaceGaps);
                         else
-                            charPixels = (int) (totalPixels*this.Options.JustifyCharacterWeightForExpand*charGaps/spaceGaps);
+                            charPixels = (int) (totalPixels * Options.JustifyCharacterWeightForExpand * charGaps /
+                                                spaceGaps);
 
 
-                        if ((!contract && charPixels > totalPixels) ||
-                            (contract && charPixels < totalPixels))
+                        if (!contract && charPixels > totalPixels ||
+                            contract && charPixels < totalPixels)
                             charPixels = totalPixels;
 
                         spacePixels = totalPixels - charPixels;
                     }
 
 
-                    int pixelsPerChar = 0; //minimum number of pixels to add per char
-                    int leftOverCharPixels = 0; //number of pixels remaining to only add for some chars
+                    var pixelsPerChar = 0; //minimum number of pixels to add per char
+                    var leftOverCharPixels = 0; //number of pixels remaining to only add for some chars
 
                     if (charGaps != 0)
                     {
-                        pixelsPerChar = charPixels/charGaps;
-                        leftOverCharPixels = charPixels - pixelsPerChar*charGaps;
+                        pixelsPerChar = charPixels / charGaps;
+                        leftOverCharPixels = charPixels - pixelsPerChar * charGaps;
                     }
 
-                    int pixelsPerSpace = 0; //minimum number of pixels to add per space
-                    int leftOverSpacePixels = 0; //number of pixels remaining to only add for some spaces
+                    var pixelsPerSpace = 0; //minimum number of pixels to add per space
+                    var leftOverSpacePixels = 0; //number of pixels remaining to only add for some spaces
 
                     if (spaceGaps != 0)
                     {
-                        pixelsPerSpace = spacePixels/spaceGaps;
-                        leftOverSpacePixels = spacePixels - pixelsPerSpace*spaceGaps;
+                        pixelsPerSpace = spacePixels / spaceGaps;
+                        leftOverSpacePixels = spacePixels - pixelsPerSpace * spaceGaps;
                     }
 
                     //now actually iterate over all nodes and set tweaked length
@@ -841,11 +803,11 @@ namespace QuickFont
                         }
                         else if (node.Type == TextNodeType.Word)
                         {
-                            int cGaps = (node.Text.Length - 1);
+                            var cGaps = node.Text.Length - 1;
                             if (CrumbledWord(node))
                                 cGaps++;
 
-                            node.LengthTweak = cGaps*pixelsPerChar;
+                            node.LengthTweak = cGaps * pixelsPerChar;
 
 
                             if (leftOverCharPixels >= cGaps)
@@ -865,7 +827,7 @@ namespace QuickFont
                             }
                         }
 
-                        if ((!contract && node == expandEndNode) || (contract && node == contractEndNode))
+                        if (!contract && node == expandEndNode || contract && node == contractEndNode)
                             break;
                     }
                 }
@@ -886,9 +848,7 @@ namespace QuickFont
         {
             if (node.Type == TextNodeType.Space && node.Next != null && node.Next.Type == TextNodeType.Word &&
                 node.ModifiedLength + node.Next.ModifiedLength + lengthSoFar > boundWidth)
-            {
                 return true;
-            }
 
             return false;
         }
@@ -899,7 +859,8 @@ namespace QuickFont
         /// <param name="text"></param>
         /// <param name="bounds"></param>
         /// <returns></returns>
-        public static ProcessedText ProcessText(QFont font, QFontRenderOptions options, string text, SizeF maxSize, QFontAlignment alignment)
+        public static ProcessedText ProcessText(QFont font, QFontRenderOptions options, string text, SizeF maxSize,
+            QFontAlignment alignment)
         {
             //TODO: bring justify and alignment calculations in here
             maxSize.Width = TransformWidthToViewport(maxSize.Width, options);
@@ -913,7 +874,7 @@ namespace QuickFont
                 if ((!options.WordWrap || node.Length >= maxSize.Width) && node.Type == TextNodeType.Word)
                     nodesToCrumble.Add(node);
 
-            foreach (TextNode node in nodesToCrumble)
+            foreach (var node in nodesToCrumble)
                 nodeList.Crumble(node, 1);
 
             //need to measure crumbled words

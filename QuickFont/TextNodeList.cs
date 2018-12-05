@@ -14,14 +14,11 @@ namespace QuickFont
         public float Length; //pixel length (without tweaks)
         public float LengthTweak; //length tweak for justification
 
-        public float ModifiedLength
-        {
-            get { return Length + LengthTweak; }
-        }
+        public float ModifiedLength => Length + LengthTweak;
 
-        public TextNode(TextNodeType Type, string Text){
-            this.Type = Type;
-            this.Text = Text;
+        public TextNode(TextNodeType type, string text){
+            this.Type = type;
+            this.Text = text;
         }
 
         public TextNode Next;
@@ -38,6 +35,8 @@ namespace QuickFont
         internal TextNodeList textNodeList;
         internal SizeF maxSize;
         internal QFontAlignment alignment;
+
+        public int EstimatedLength() => textNodeList.EstimatedLength;
     }
 
     /// <summary>
@@ -45,15 +44,16 @@ namespace QuickFont
     /// </summary>
     class TextNodeList : IEnumerable
     {
-        public TextNode Head;
-        public TextNode Tail;
-
+        internal TextNode Head;
+        internal TextNode Tail;
+        public int EstimatedLength { get; }
         /// <summary>
         /// Builds a doubly linked list of text nodes from the given input string
         /// </summary>
         /// <param name="text"></param>
         public TextNodeList(string text)
         {
+            EstimatedLength = text.Length;
             #region parse text
 
             text = text.Replace("\r\n", "\r");
@@ -61,9 +61,9 @@ namespace QuickFont
             bool wordInProgress = false;
             StringBuilder currentWord = new StringBuilder();
 
-            for (int i = 0; i < text.Length; i++)
+            foreach (var Ch in text)
             {
-                if (text[i] == '\r' || text[i] == '\n' || text[i] == ' ')
+                if (Ch == '\r' || Ch == '\n' || Ch == ' ')
                 {
                     if (wordInProgress)
                     {
@@ -71,9 +71,9 @@ namespace QuickFont
                         wordInProgress = false;
                     }
 
-                    if (text[i] == '\r' || text[i] == '\n')
+                    if (Ch == '\r' || Ch == '\n')
                         Add(new TextNode(TextNodeType.LineBreak, null));
-                    else if (text[i] == ' ')
+                    else if (Ch == ' ')
                         Add(new TextNode(TextNodeType.Space, null));
 
                 }
@@ -85,9 +85,8 @@ namespace QuickFont
                         currentWord = new StringBuilder();
                     }
 
-                    currentWord.Append(text[i]);
+                    currentWord.Append(Ch);
                 }
-
             }
 
             if (wordInProgress)
@@ -121,16 +120,16 @@ namespace QuickFont
             float length = 0f;
             if (node.Type == TextNodeType.Word)
             {
-                
                 for (int i = 0; i < node.Text.Length; i++)
                 {
                     char c = node.Text[i];
-                    if (fontData.CharSetMapping.ContainsKey(c))
+                    QFontGlyph glyph;
+                    if (fontData.CharSetMapping.TryGetValue(c,out glyph))
                     {
                         if (monospaced)
                             length += monospaceWidth;
                         else
-                            length += (float)Math.Ceiling(fontData.CharSetMapping[c].rect.Width + fontData.meanGlyphWidth * options.CharacterSpacing + fontData.GetKerningPairCorrection(i, node.Text, node));
+                            length += (float)Math.Ceiling(glyph.rect.Width + fontData.meanGlyphWidth * options.CharacterSpacing + fontData.GetKerningPairCorrection(i, node.Text, node));
                     }
                 }
             }
@@ -267,11 +266,6 @@ namespace QuickFont
             public void Reset()
             {
                 currentNode = null;
-            }
-
-            public void Dispose()
-            {
-
             }
         }
     }

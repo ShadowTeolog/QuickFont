@@ -304,9 +304,7 @@ namespace StarterKit
             //gl.vertex3(bounds.x, bounds.y + height, 0f);
             //gl.end();
 
-            var dp = new QFontDrawingPimitive(font);
-            dp.Print(text, new Vector3(bounds.X, Height - yOffset, 0), new SizeF(maxWidth, float.MaxValue), alignment);
-            drawing.DrawingPimitiveses.Add(dp);
+            drawing.Print(font,text,new Vector3(bounds.X, Height - yOffset, 0),new SizeF(maxWidth, float.MaxValue), alignment);
 
             yOffset += height;
         }       
@@ -323,10 +321,9 @@ namespace StarterKit
         {
             yOffset += 20;
             var pos = new Vector3(30f, Height - yOffset, 0f);
-            var dp = new QFontDrawingPimitive(font, opts ?? new QFontRenderOptions());
-            dp.Print(comment, pos, new SizeF(Width - 60, -1), alignment);
-            yOffset += dp.Measure(comment, new SizeF(Width - 60, -1), alignment).Height;
-            drawing.DrawingPimitiveses.Add(dp);
+            var size=drawing.Print(font,comment, pos, new SizeF(Width - 60, -1), alignment,opts ?? new QFontRenderOptions());
+            yOffset += size.Height;
+            
         }
 
         private void PrintCommentWithLine(string comment, QFontAlignment alignment, float xOffset, ref float yOffset)
@@ -337,20 +334,8 @@ namespace StarterKit
         private void PrintCommentWithLine(QFont font, string comment, QFontAlignment alignment, float xOffset, ref float yOffset, QFontRenderOptions opts)
         {
             yOffset += 20;
-            var dp = new QFontDrawingPimitive(font, opts);
-            //if (doSpacing)
-            //    dp.Options.CharacterSpacing = 0.05f;
-            dp.Print(comment, new Vector3(xOffset, Height - yOffset, 0f), new SizeF(Width - 60, -1), alignment);
-            drawing.DrawingPimitiveses.Add(dp);
-            var bounds = font.Measure(comment, new SizeF(Width - 60, float.MaxValue), alignment);
-
-            //GL.Disable(EnableCap.Texture2D);
-            //GL.Begin(BeginMode.Lines);
-            //GL.Color4(1.0f, 0f, 0f, 1f); GL.Vertex2(0f, 0f);
-            //GL.Color4(1.0f, 0f, 0f, 1f); GL.Vertex2(0f, bounds.Height + 20f);
-            //GL.End();
-
-            yOffset += bounds.Height;
+            var result=drawing.Print(font,comment, new Vector3(xOffset, Height - yOffset, 0f), new SizeF(Width - 60, -1), alignment,opts);
+            yOffset += result.Height;
         }
 
         
@@ -392,7 +377,7 @@ namespace StarterKit
             {
                 _previousPage = currentDemoPage;
                 // we have to rebuild the stuff
-                drawing.DrawingPimitiveses.Clear();
+                drawing.Clear();
                             
                 switch (currentDemoPage)
                 {
@@ -530,15 +515,17 @@ namespace StarterKit
                             _previousPage = -1;
 
                             // store this primitive to remember
-                            QFontDrawingPimitive dp = new QFontDrawingPimitive(heading2);
-                            dp.Options.DropShadowActive = true;
-                            dp.Options.DropShadowOffset = new Vector2(0.1f + 0.2f*(float) Math.Sin(cnt),
-                                                                            0.1f + 0.2f*(float) Math.Cos(cnt));
 
-                            yOffset += dp.Print("Drop Shadows",
+                            var renderoptions = new QFontRenderOptions()
+                            {
+                                DropShadowActive = true,
+                                DropShadowOffset = new Vector2(0.1f + 0.2f * (float) Math.Sin(cnt),
+                                    0.1f + 0.2f * (float) Math.Cos(cnt))
+                            };
+
+                            yOffset += drawing.Print(heading2,"Drop Shadows",
                                                                      new Vector3(20f, Height - yOffset, 0f),
-                                                                     QFontAlignment.Left).Height;
-                            drawing.DrawingPimitiveses.Add(dp);
+                                                                     QFontAlignment.Left,renderoptions).Height;
 
                             PrintComment(asIhaveleant, ref yOffset);
                             PrintCode(dropShadowCode1, ref yOffset);
@@ -632,7 +619,7 @@ namespace StarterKit
 
             // Create controlsDrawing every time.. would be also good to vary ProjectionMatrix with * Matrix4.CreateTranslation() !
             // this would save buffer work for OpenGL
-            controlsDrawing.DrawingPimitiveses.Clear();
+            controlsDrawing.Clear();
             controlsDrawing.ProjectionMatrix = _projectionMatrix;
 
             if (currentDemoPage != lastPage)

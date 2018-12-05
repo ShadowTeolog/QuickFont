@@ -62,9 +62,10 @@ namespace QuickFont.Configuration
 
         public CharacterKerningRule GetCharacterKerningRule(char c)
         {
-            if (CharacterKerningRules.ContainsKey(c))
+            CharacterKerningRule rule;
+            if (CharacterKerningRules.TryGetValue(c,out rule))
             {
-                return CharacterKerningRules[c];
+                return rule;
             }
             return CharacterKerningRule.Normal;
         }

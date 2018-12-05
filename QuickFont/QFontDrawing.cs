@@ -45,11 +45,6 @@ namespace QuickFont
             set { _projectionMatrix = value; }
         }
 
-        public List<QFontDrawingPimitive> DrawingPimitiveses
-        {
-            get { return _glFontDrawingPimitives; }
-        }
-
         /// <summary>
         /// Load shader string from ressource
         /// </summary>
@@ -268,31 +263,31 @@ namespace QuickFont
         public SizeF Print(QFont font, ProcessedText text, Vector3 position, QFontRenderOptions opt)
         {
             var dp = new QFontDrawingPimitive(font, opt);
-            DrawingPimitiveses.Add(dp);
+            _glFontDrawingPimitives.Add(dp);
             return dp.Print(text, position, opt.ClippingRectangle);
         }
 
         public SizeF Print(QFont font, ProcessedText processedText, Vector3 position, Color? colour = null, Rectangle clippingRectangle = default(Rectangle))
         {
             var dp = new QFontDrawingPimitive(font);
-            DrawingPimitiveses.Add(dp);
-            if (colour.HasValue)
-                return dp.Print(processedText, position, colour.Value);
-            else
-                return dp.Print(processedText, position);
+            var size=(colour.HasValue) 
+                    ? dp.Print(processedText, position, colour.Value)
+                    : dp.Print(processedText, position);
+            _glFontDrawingPimitives.Add(dp);
+            return size;
         }
 
         public SizeF Print(QFont font, string text, Vector3 position, QFontAlignment alignment, QFontRenderOptions opt)
         {
             var dp = new QFontDrawingPimitive(font, opt);
-            DrawingPimitiveses.Add(dp);
+            _glFontDrawingPimitives.Add(dp);
             return dp.Print(text, position, alignment, opt.ClippingRectangle);
         }
 
         public SizeF Print(QFont font, string text, Vector3 position, QFontAlignment alignment, Color? color = null, Rectangle clippingRectangle = default(Rectangle))
         {
             var dp = new QFontDrawingPimitive(font);
-            DrawingPimitiveses.Add(dp);
+            _glFontDrawingPimitives.Add(dp);
             if( color.HasValue )
                 return dp.Print(text, position, alignment, color.Value, clippingRectangle);
             return dp.Print(text, position, alignment, clippingRectangle);
@@ -301,14 +296,14 @@ namespace QuickFont
         public SizeF Print(QFont font, string text, Vector3 position, SizeF maxSize, QFontAlignment alignment, Rectangle clippingRectangle = default(Rectangle))
         {
             var dp = new QFontDrawingPimitive(font);
-            DrawingPimitiveses.Add(dp);
+            _glFontDrawingPimitives.Add(dp);
             return dp.Print(text, position, maxSize, alignment, clippingRectangle);
         }
 
         public SizeF Print(QFont font, string text, Vector3 position, SizeF maxSize, QFontAlignment alignment, QFontRenderOptions opt )
         {
             var dp = new QFontDrawingPimitive(font, opt);
-            DrawingPimitiveses.Add(dp);
+            _glFontDrawingPimitives.Add(dp);
             return dp.Print(text, position, maxSize, alignment, opt.ClippingRectangle);
         }
 
@@ -358,6 +353,11 @@ namespace QuickFont
         }
 
         #endregion
+
+        public void Clear()
+        {
+            _glFontDrawingPimitives.Clear();
+        }
     }
 
 
