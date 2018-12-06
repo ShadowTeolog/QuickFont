@@ -204,11 +204,11 @@ namespace QuickFont
                     if (primitive.ShadowVertexRepr.Count > 0)
                     {
                         //int index = primitive.Font.FontData.CalculateMaxHeight();
-                        GL.BindTexture(TextureTarget.Texture2D, font.FontData.dropShadowFont.FontData.Pages[0].GLTexID);
+                        GL.BindTexture(TextureTarget.Texture2D, font.dropShadowFont.FontData.Pages[0].GLTexID);
                         GL.DrawArrays(PrimitiveType.Triangles, start, primitive.ShadowVertexRepr.Count);
                         start += primitive.ShadowVertexRepr.Count;
                     }
-                    GL.BindTexture(TextureTarget.Texture2D, font.FontData.Pages[0].GLTexID);
+                    GL.BindTexture(TextureTarget.Texture2D, font.Pages[0].GLTexID);
                     GL.DrawArrays(PrimitiveType.Triangles, start, primitive.CurrentVertexRepr.Count);
                 }
                 else

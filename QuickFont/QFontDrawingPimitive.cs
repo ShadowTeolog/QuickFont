@@ -8,7 +8,7 @@ namespace QuickFont
 {
     public class QFontDrawingPimitive
     {
-        public readonly QFont Font;
+        internal readonly QFontData Font;
         public readonly QFontRenderOptions Options;
 
 #if DEBUG // Keep copy of string for debug purposes, only
@@ -18,13 +18,13 @@ namespace QuickFont
 
         public QFontDrawingPimitive(QFont font, QFontRenderOptions options)
         {
-            Font = font;
+            Font = font.FontData;
             Options = options;
         }
 
         public QFontDrawingPimitive(QFont font)
         {
-            Font = font;
+            Font = font.FontData;
             Options = new QFontRenderOptions();
         }
 
@@ -34,17 +34,17 @@ namespace QuickFont
 
         private float LineSpacing()
         {
-            return (float) Math.Ceiling(Font.FontData.maxGlyphHeight * Options.LineSpacing);
+            return (float) Math.Ceiling(Font.maxGlyphHeight * Options.LineSpacing);
         }
 
         private bool IsMonospacingActive()
         {
-            return Font.FontData.IsMonospacingActive(Options);
+            return Font.IsMonospacingActive(Options);
         }
 
         private float MonoSpaceWidth()
         {
-            return Font.FontData.GetMonoSpaceWidth(Options);
+            return Font.GetMonoSpaceWidth(Options);
         }
 
         private void RenderDropShadow(float x, float y, char c, QFontGlyph nonShadowGlyph, QFontData shadowFont,
@@ -53,9 +53,9 @@ namespace QuickFont
             //note can cast drop shadow offset to int, but then you can't move the shadow smoothly...
             if (shadowFont != null && Options.DropShadowActive)
             {
-                var xOffset = Font.FontData.meanGlyphWidth * Options.DropShadowOffset.X +
+                var xOffset = Font.meanGlyphWidth * Options.DropShadowOffset.X +
                               nonShadowGlyph.rect.Width * 0.5f;
-                var yOffset = Font.FontData.meanGlyphWidth * Options.DropShadowOffset.Y +
+                var yOffset = Font.meanGlyphWidth * Options.DropShadowOffset.Y +
                               nonShadowGlyph.rect.Height * 0.5f + nonShadowGlyph.yOffset;
                 RenderGlyph(x + xOffset, y + yOffset, c, shadowFont, ShadowVertexRepr, ref clippingRectangle);
             }
@@ -204,12 +204,12 @@ namespace QuickFont
                 {
                     QFontGlyph glyph;
                     if (c == ' ')
-                        xOffset += (float) Math.Ceiling(Font.FontData.meanGlyphWidth * Options.WordSpacing);
-                    else if (Font.FontData.CharSetMapping.TryGetValue(c, out glyph)) //normal character
+                        xOffset += (float) Math.Ceiling(Font.meanGlyphWidth * Options.WordSpacing);
+                    else if (Font.CharSetMapping.TryGetValue(c, out glyph)) //normal character
                         xOffset +=
                             (float)
-                            Math.Ceiling(glyph.rect.Width + Font.FontData.meanGlyphWidth * Options.CharacterSpacing +
-                                         Font.FontData.GetKerningPairCorrection(i, text, null));
+                            Math.Ceiling(glyph.rect.Width + Font.meanGlyphWidth * Options.CharacterSpacing +
+                                         Font.GetKerningPairCorrection(i, text, null));
                 }
             }
 
@@ -371,9 +371,6 @@ namespace QuickFont
                 xOffset -= (int) (0.5f * MeasureNextlineLength(text));
             var lineSpacing = LineSpacing();
             var isMonospacingActive = IsMonospacingActive();
-            var fontdata = Font?.FontData;
-            if(fontdata!=null)
-                
             for (var i = 0; i < text.Length; i++)
             {
                 var c = text[i];
@@ -396,22 +393,22 @@ namespace QuickFont
                     {
                         xOffset += isMonospacingActive
                             ? MonoSpaceWidth()
-                                : (float) Math.Ceiling(fontdata.meanGlyphWidth * Options.WordSpacing);
+                                : (float) Math.Ceiling(Font.meanGlyphWidth * Options.WordSpacing);
                     }
                     else
                     {
                         QFontGlyph glyph;
                         //normal character
-                            if (fontdata.CharSetMapping.TryGetValue(c, out glyph))
+                            if (Font.CharSetMapping.TryGetValue(c, out glyph))
                         {
                             if (!measureOnly)
-                                    RenderGlyph(xOffset, yOffset, c, fontdata, CurrentVertexRepr, ref clippingRectangle);
+                                    RenderGlyph(xOffset, yOffset, c, Font, CurrentVertexRepr, ref clippingRectangle);
                             if (isMonospacingActive)
                                 xOffset += MonoSpaceWidth();
                             else
                                 xOffset += (float) Math.Ceiling(
-                                    glyph.rect.Width + Font.FontData.meanGlyphWidth * Options.CharacterSpacing +
-                                        fontdata.GetKerningPairCorrection(i, text, null));
+                                    glyph.rect.Width + Font.meanGlyphWidth * Options.CharacterSpacing +
+                                    Font.GetKerningPairCorrection(i, text, null));
                         }
                     }
 
@@ -549,22 +546,20 @@ namespace QuickFont
             }
 
             var isMonospacingActive = IsMonospacingActive();
-            var fontdata = Font?.FontData;
-            if(fontdata!=null)
             for (var i = 0; i < node.Text.Length; i++)
             {
                 var c = node.Text[i];
                 QFontGlyph glyph;
-                if (fontdata.CharSetMapping.TryGetValue(c, out glyph))
+                if (Font.CharSetMapping.TryGetValue(c, out glyph))
                 {
-                    RenderGlyph(x, y, c, fontdata, CurrentVertexRepr, ref clippingRectangle);
+                    RenderGlyph(x, y, c, Font, CurrentVertexRepr, ref clippingRectangle);
                     if (isMonospacingActive)
                         x += MonoSpaceWidth();
                     else
                         x +=
                             (int)
-                            Math.Ceiling(glyph.rect.Width +fontdata.meanGlyphWidth * Options.CharacterSpacing +
-                                         fontdata.GetKerningPairCorrection(i, node.Text, node));
+                            Math.Ceiling(glyph.rect.Width +Font.meanGlyphWidth * Options.CharacterSpacing +
+                                         Font.GetKerningPairCorrection(i, node.Text, node));
 
                     x += pixelsPerGap;
                     if (leftOverPixels > 0)
@@ -857,21 +852,23 @@ namespace QuickFont
 
             return false;
         }
-
         /// <summary>
         ///     Creates node list object associated with the text.
         /// </summary>
         /// <param name="text"></param>
         /// <param name="bounds"></param>
         /// <returns></returns>
-        public static ProcessedText ProcessText(QFont font, QFontRenderOptions options, string text, SizeF maxSize,
-            QFontAlignment alignment)
+        public static ProcessedText ProcessText(QFont font, QFontRenderOptions options, string text,SizeF maxSize, QFontAlignment alignment)
+        {
+            return ProcessText(font.FontData, options, text, maxSize, alignment);
+        }
+        internal static ProcessedText ProcessText(QFontData font, QFontRenderOptions options, string text, SizeF maxSize,QFontAlignment alignment)
         {
             //TODO: bring justify and alignment calculations in here
             maxSize.Width = TransformWidthToViewport(maxSize.Width, options);
 
             var nodeList = new TextNodeList(text);
-            nodeList.MeasureNodes(font.FontData, options);
+            nodeList.MeasureNodes(font, options);
 
             //we "crumble" words that are two long so that that can be split up
             var nodesToCrumble = new List<TextNode>();
@@ -883,13 +880,10 @@ namespace QuickFont
                 nodeList.Crumble(node, 1);
 
             //need to measure crumbled words
-            nodeList.MeasureNodes(font.FontData, options);
+            nodeList.MeasureNodes(font, options);
 
 
-            var processedText = new ProcessedText();
-            processedText.textNodeList = nodeList;
-            processedText.maxSize = maxSize;
-            processedText.alignment = alignment;
+            var processedText = new ProcessedText {textNodeList = nodeList, maxSize = maxSize, alignment = alignment};
 
 
             return processedText;
