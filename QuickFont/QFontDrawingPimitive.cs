@@ -47,7 +47,7 @@ namespace QuickFont
             return Font.FontData.GetMonoSpaceWidth(Options);
         }
 
-        private void RenderDropShadow(float x, float y, char c, QFontGlyph nonShadowGlyph, QFont shadowFont,
+        private void RenderDropShadow(float x, float y, char c, QFontGlyph nonShadowGlyph, QFontData shadowFont,
             ref Rectangle clippingRectangle)
         {
             //note can cast drop shadow offset to int, but then you can't move the shadow smoothly...
@@ -131,26 +131,26 @@ namespace QuickFont
         /// <param name="c">The character to print.</param>
         /// <param name="font">font used for render</param>
         /// <param name="store">target vertex buffer</param>
-        internal void RenderGlyph(float x, float y, char c, QFont font, List<QVertex> store, ref Rectangle clippingRectangle)
+        internal void RenderGlyph(float x, float y, char c, QFontData fontdata, List<QVertex> store, ref Rectangle clippingRectangle)
         {
-            var glyph = font.FontData.CharSetMapping[c];
+            var glyph = fontdata.CharSetMapping[c];
 
             //note: it's not immediately obvious, but this combined with the paramteters to 
             //RenderGlyph for the shadow mean that we render the shadow centrally (despite it being a different size)
             //under the glyph
-            if (font.FontData.isDropShadow)
+            if (fontdata.isDropShadow)
             {
                 x -= (int) (glyph.rect.Width * 0.5f);
                 y -= (int) (glyph.rect.Height * 0.5f + glyph.yOffset);
             }
             else
             {
-                RenderDropShadow(x, y, c, glyph, font.FontData.dropShadowFont, ref clippingRectangle);
+                RenderDropShadow(x, y, c, glyph, fontdata.dropShadowFont?.FontData, ref clippingRectangle);
             }
 
             y = -y;
 
-            var sheet = font.FontData.Pages[glyph.page];
+            var sheet = fontdata.Pages[glyph.page];
 
             var tx1 = (float) glyph.rect.X / sheet.Width;
             var ty1 = (float) glyph.rect.Y / sheet.Height;
@@ -175,7 +175,7 @@ namespace QuickFont
             var v3 = new Vector3(vx + vwidth, vy - vheight, PrintOffset.Z);
             var v4 = new Vector3(vx + vwidth, vy, PrintOffset.Z);
 
-            var color = font.FontData.isDropShadow ? Options.DropShadowColour : Options.Colour;
+            var color = fontdata.isDropShadow ? Options.DropShadowColour : Options.Colour;
 
             var colour = Helper.ToVector4(color);
 
@@ -371,6 +371,9 @@ namespace QuickFont
                 xOffset -= (int) (0.5f * MeasureNextlineLength(text));
             var lineSpacing = LineSpacing();
             var isMonospacingActive = IsMonospacingActive();
+            var fontdata = Font?.FontData;
+            if(fontdata!=null)
+                
             for (var i = 0; i < text.Length; i++)
             {
                 var c = text[i];
@@ -393,22 +396,22 @@ namespace QuickFont
                     {
                         xOffset += isMonospacingActive
                             ? MonoSpaceWidth()
-                            : (float) Math.Ceiling(Font.FontData.meanGlyphWidth * Options.WordSpacing);
+                                : (float) Math.Ceiling(fontdata.meanGlyphWidth * Options.WordSpacing);
                     }
                     else
                     {
                         QFontGlyph glyph;
                         //normal character
-                        if (Font.FontData.CharSetMapping.TryGetValue(c, out glyph))
+                            if (fontdata.CharSetMapping.TryGetValue(c, out glyph))
                         {
                             if (!measureOnly)
-                                RenderGlyph(xOffset, yOffset, c, Font, CurrentVertexRepr, ref clippingRectangle);
+                                    RenderGlyph(xOffset, yOffset, c, fontdata, CurrentVertexRepr, ref clippingRectangle);
                             if (isMonospacingActive)
                                 xOffset += MonoSpaceWidth();
                             else
                                 xOffset += (float) Math.Ceiling(
                                     glyph.rect.Width + Font.FontData.meanGlyphWidth * Options.CharacterSpacing +
-                                    Font.FontData.GetKerningPairCorrection(i, text, null));
+                                        fontdata.GetKerningPairCorrection(i, text, null));
                         }
                     }
 
@@ -546,20 +549,22 @@ namespace QuickFont
             }
 
             var isMonospacingActive = IsMonospacingActive();
+            var fontdata = Font?.FontData;
+            if(fontdata!=null)
             for (var i = 0; i < node.Text.Length; i++)
             {
                 var c = node.Text[i];
                 QFontGlyph glyph;
-                if (Font.FontData.CharSetMapping.TryGetValue(c, out glyph))
+                if (fontdata.CharSetMapping.TryGetValue(c, out glyph))
                 {
-                    RenderGlyph(x, y, c, Font, CurrentVertexRepr, ref clippingRectangle);
+                    RenderGlyph(x, y, c, fontdata, CurrentVertexRepr, ref clippingRectangle);
                     if (isMonospacingActive)
                         x += MonoSpaceWidth();
                     else
                         x +=
                             (int)
-                            Math.Ceiling(glyph.rect.Width + Font.FontData.meanGlyphWidth * Options.CharacterSpacing +
-                                         Font.FontData.GetKerningPairCorrection(i, node.Text, node));
+                            Math.Ceiling(glyph.rect.Width +fontdata.meanGlyphWidth * Options.CharacterSpacing +
+                                         fontdata.GetKerningPairCorrection(i, node.Text, node));
 
                     x += pixelsPerGap;
                     if (leftOverPixels > 0)
